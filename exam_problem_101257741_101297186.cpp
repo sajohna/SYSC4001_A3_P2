@@ -12,20 +12,42 @@ std::vector<char*> exam_list; //The list of exam file names
 int next_exam_number; //the index of the next exam file name
 
 std::vector<rubric_line> rubric;
+char* rubric_file;
 
 std::vector<ta> tas;
 
 std::tuple<std::string> run_simulation() {
+    using namespace std::this_thread; // sleep_for, sleep_until
+    using namespace std::chrono; // nanoseconds, system_clock, seconds
+
     while(next_exam_number<exam_list.size()){
         for(ta current_ta : tas){
             for(rubric_line linez : rubric){
                 bool correct = rand() < 0.5;
+                int time_period = (rand()/2 +0.5)*1000;
+                sleep_for(milliseconds(time_period));
                 if(correct){
-                    correct
+                    correct_rubric(linez);
                 }
             }
         }
     }
+}
+
+void correct_rubric(rubric_line linez){
+    linez.text++;
+
+    std::ofstream output_file(rubric_file);
+
+    //
+    if (output_file.is_open()) {
+        output_file.put();
+        output_file.close();  // Close the file when done
+        std::cout << "File content overwritten successfully." << std::endl;
+    } else {
+        std::cerr << "Error opening file!" << std::endl;
+    }
+    rubric_file 
 }
 
 void load_exam(){
@@ -64,6 +86,7 @@ int main(int argc, char** argv) {
 
     //open the rubric file
     auto rubric_file_name = argv[1];
+    rubric_file = rubric_file_name;
     std::ifstream rubric_file;
     rubric_file.open(rubric_file_name);
 

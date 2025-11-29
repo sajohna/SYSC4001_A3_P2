@@ -18,6 +18,8 @@
 #include<sstream>
 #include<iomanip>
 #include<algorithm>
+#include <chrono>
+#include <thread>
 
 //An enumeration of actions to make assignment easier
 enum action {
@@ -33,7 +35,7 @@ struct exam{
 
 struct rubric_line{
     int             exercise;
-    std::string     text;
+    char        text;
 };
 
 struct ta{

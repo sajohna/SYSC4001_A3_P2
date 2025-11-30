@@ -18,8 +18,9 @@
 #include<sstream>
 #include<iomanip>
 #include<algorithm>
-#include <chrono>
-#include <thread>
+#include<chrono>
+#include<thread>
+#include<unistd.h>
 
 //An enumeration of actions to make assignment easier
 enum action {
@@ -77,17 +78,17 @@ rubric_line add_rubric_line (std::vector<std::string> tokens) {
     return linez;
 }
 
-std::vector<ta> add_tas (std::vector<std::string> tokens) {
-    std::vector<ta> list_tas;
+int add_tas (std::vector<std::string> tokens) {
+    //std::vector<ta> list_tas;
     int ta_num = std::stoi(tokens[0]);
-    for (int i = 0; i < ta_num; i++){
-        ta new_ta;
-        new_ta.id = i;
-        new_ta.current_action = READ;
-        new_ta.rubric_line = 0;
-        list_tas.push_back(new_ta);
-    }
-    return list_tas;
+    //for (int i = 0; i < ta_num; i++){
+        //ta new_ta;
+        //new_ta.id = i;
+        //new_ta.current_action = READ;
+        //new_ta.rubric_line = 0;
+        //list_tas.push_back(new_ta);
+    //}
+    return ta_num;
 }
 
 void write_output (std::string execution, const char* filename) {

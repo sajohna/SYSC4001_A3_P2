@@ -14,7 +14,8 @@ int next_exam_number; //the index of the next exam file name
 std::vector<rubric_line> rubric;
 char* rubric_file;
 
-std::vector<ta> tas;
+int ta_num;
+pid_t c_pid;
 
 void correct_rubric (int index){
     std::cout<<"correcting rubric line...\n";
@@ -61,47 +62,48 @@ void load_exam (){
     next_exam_number++;
 }
 
-std::tuple<std::string> run_simulation() {
+void run_simulation() {
     std::cout<<"running simulation... \n";
     using namespace std::this_thread; // sleep_for, sleep_until
     using namespace std::chrono; // nanoseconds, system_clock, seconds
-    srand(time(0));
+    srand(time(0) + c_pid);
 
     while (next_exam_number<exam_list.size() && current_exam.student_id != 9999){
         std::cout<<"grading exam number " +std::to_string(next_exam_number) +"\n";
-        for (ta current_ta : tas){
-            std::cout<<"next ta\n";
-            for (int i = 0; i < rubric.size(); i++){//reviewing and possibly correcting rubric
-                std::cout<<"checking rubric file line\n";
-                bool correct = rand()/ double(RAND_MAX) < 0.5;
-                std::cout<<"line correct: " +std::to_string(correct) +"\n";
-                int time_period = ((rand() / (double(RAND_MAX) * 2 )) + 0.5) * 1000;
-                std::cout<<"time delay: " +std::to_string(time_period) +"\n";
-                sleep_for (milliseconds(time_period));
-                if (correct){
-                    std::cout<<"correcting the rubric...\n";
-                    correct_rubric (i);
-                }
-            }
-            std::cout<<"marking exam... \n";
-            bool marked = false;
-            for (int i = 0; i < rubric.size(); i++){
-                if (current_exam.questions_marked[i] == false){\
-                    std::cout<<"marking exam question # " +std::to_string(i) +"...\n";
-                    current_exam.questions_marked[i] = true;
-                    marked = true;
-                    int time_period = ((rand()/ double(RAND_MAX)) + 1) * 1000;
-                    sleep_for(milliseconds(time_period));
-                    std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise) +"\n";
-                    break;
-                }
-            }
-            if (marked == false){
-                load_exam();
+        
+        for (int i = 0; i < rubric.size(); i++){//reviewing and possibly correcting rubric
+            std::cout<<"checking rubric file line\n";
+            bool correct = rand()/ double(RAND_MAX) < 0.5;
+            std::cout<<"line correct: " +std::to_string(correct) +"\n";
+            int time_period = ((rand() / (double(RAND_MAX) * 2 )) + 0.5) * 1000;
+            std::cout<<"time delay: " +std::to_string(time_period) +"\n";
+            sleep_for (milliseconds(time_period));
+            if (correct){
+                std::cout<<"correcting the rubric...\n";
+                correct_rubric (i);
             }
         }
+        std::cout<<"marking exam... \n";
+        bool marked = false;
+        for (int i = 0; i < rubric.size(); i++){
+            if (current_exam.questions_marked[i] == false){\
+                std::cout<<"marking exam question # " +std::to_string(i) +"...\n";
+                current_exam.questions_marked[i] = true;
+                marked = true;
+                int time_period = ((rand()/ double(RAND_MAX)) + 1) * 1000;
+                sleep_for(milliseconds(time_period));
+                std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise) +"\n";
+                break;
+            }
+        }
+        if(next_exam_number > exam_list.size()){
+            return;
+        }
+        if (marked == false){
+            load_exam();
+        }
     }
-    return "";
+    return;
 }
 
 //deals with opening and reading file and writing to the execution file
@@ -142,7 +144,7 @@ int main (int argc, char** argv) {
     while (std::getline(ta_file, line)) {
         auto input_tokens = split_delim(line, ", ");
         auto new_tas = add_tas(input_tokens);
-        tas = new_tas;
+        ta_num = new_tas;
     }
     ta_file.close();
 
@@ -154,9 +156,17 @@ int main (int argc, char** argv) {
 
     load_exam();
     std::cout<<"exam loaded\n";
-    //With the list of processes, run the simulation
-    auto [exec] = run_simulation();
 
+    for(int i = 1; i<ta_num; i++){
+        c_pid = fork();
+        if(c_pid == 0){
+            break;
+        }
+    }
+    //With the list of processes, run the simulation
+    run_simulation();
+
+    exit(c_pid);
     //write_output(exec, "execution.txt");
 
     return 0;

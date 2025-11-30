@@ -35,7 +35,7 @@ struct exam{
 
 struct rubric_line{
     int             exercise;
-    char        text;
+    char            text;
 };
 
 struct ta{

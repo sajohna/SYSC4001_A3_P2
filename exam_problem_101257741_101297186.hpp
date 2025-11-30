@@ -21,6 +21,16 @@
 #include<chrono>
 #include<thread>
 #include<unistd.h>
+#include <sys/sem.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+
+std::vector<int> shm_id;
 
 //An enumeration of actions to make assignment easier
 enum action {
@@ -31,7 +41,7 @@ enum action {
 
 struct exam {
     int                 student_id;
-    std::vector<bool>   questions_marked;
+    std::vector<bool*>   questions_marked;
 };
 
 struct rubric_line {
@@ -44,6 +54,52 @@ struct ta {
     action          current_action;
     int             rubric_line;
 };
+
+union semun {
+    int val;
+    struct semid_ds *buf;
+    ushort * array;
+} arg ;
+
+int SemaphoreWait(int semid, int iMayBlock ) {
+    struct sembuf sbOperation;
+    sbOperation.sem_num = 0;
+    sbOperation.sem_op = -1;
+    sbOperation.sem_flg = iMayBlock;
+    return semop( semid, &sbOperation, 1 );
+}
+
+int SemaphoreSignal( int semid ) {
+    struct sembuf sbOperation;
+    sbOperation.sem_num = 0;
+    sbOperation.sem_op = +1;
+    sbOperation.sem_flg = 0;
+    return semop( semid, &sbOperation, 1 );
+}
+
+void SemaphoreRemove( int semid ) {
+    if(semid != -1 )
+    semctl( semid, 0, IPC_RMID , 0);
+}
+
+int SemaphoreCreate(int iInitialValue) {
+    int semid;
+    union semun suInitData;
+    int iError;
+    /* get a semaphore */
+    semid = semget( IPC_PRIVATE, 1, IPC_CREAT|0600);
+    /* check for errors */
+    if( semid == -1 )
+    return semid;
+    /* now initialize the semaphore */
+    suInitData.val = iInitialValue;
+    if(semctl( semid, 0, SETVAL, suInitData) == -1 )
+    { /* error occurred, so remove semaphore */
+        SemaphoreRemove(semid);
+        return -1;
+    }
+    return semid;
+}
 
 std::vector<std::string> split_delim(std::string input, std::string delim) {
     std::vector<std::string> tokens;
@@ -59,13 +115,36 @@ std::vector<std::string> split_delim(std::string input, std::string delim) {
     return tokens;
 }
 
+void clear_exam(){
+    if(shm_id.size() > 0){
+        for(int i = 0; i<shm_id.size(); i++){
+            if (shmctl(shm_id[i], IPC_RMID, (struct shmid_ds *) 0) < 0){
+                perror("can’t IPC_RMID shared");
+                exit(0);
+            }
+        }
+    }
+}
+
 exam add_exam (std::vector<std::string> tokens, int num_questions) {
     std::cout<<"in add exam\n";
     exam examz;
     examz.student_id = std::stoi(tokens[0]);
     examz.questions_marked.resize(num_questions);
-    for (int i = 0; i<num_questions; i++){
-        examz.questions_marked[i] = false;
+    int shm_size1 = sizeof(examz.questions_marked);
+    
+    for (int i = 0; i < num_questions; i++){
+        int shm_idz;
+        if ((shm_idz = shmget(IPC_PRIVATE, shm_size1, IPC_CREAT | 0600)) <= 0) {
+            perror( "Error in shmget");
+        }
+        try{
+            examz.questions_marked[i] = (bool * ) shmat (shm_idz, (char *)0, 0 );
+        }catch(...){
+            perror("Error in shmat");
+        }
+        *(examz.questions_marked[i]) = false;
+        shm_id.push_back(shm_idz);
     }
 
     return examz;

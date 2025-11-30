@@ -10,16 +10,37 @@
 exam current_exam;   //The current exam
 std::vector<char*> exam_list; //The list of exam file names
 int next_exam_number; //the index of the next exam file name
+int exam_mutex;
+int question_mutex;
 
 std::vector<rubric_line> rubric;
 char* rubric_file;
+int rubric_mutex;
 
 int ta_num;
 pid_t c_pid;
 
+void read_rubric (){
+    rubric.clear();
+    std::ifstream rubric_filez (rubric_file);
+
+    //Parse the entire rubric input file and populate a vector of rubric lines.
+    //To do so, the add_rubric_line() helper function is used (see include file).
+    std::string line;
+    while (std::getline(rubric_filez, line)) {
+        auto input_tokens = split_delim(line, ", ");
+        auto new_rubric_line = add_rubric_line(input_tokens);
+        rubric.push_back(new_rubric_line);
+    }
+    rubric_filez.close();
+}
+
 void correct_rubric (int index){
     std::cout<<"correcting rubric line...\n";
     rubric[index].text++;
+
+    SemaphoreWait(rubric_mutex, 1);
+    // access the critical section here.
 
     std::ofstream output_file (rubric_file);
 
@@ -33,15 +54,23 @@ void correct_rubric (int index){
     } else {
         std::cerr << "Error opening file!" << std::endl;
     }
+
+    SemaphoreSignal(rubric_mutex);
 }
 
 void load_exam (){
     std::cout<<"loading exam number " +std::to_string(next_exam_number) +"\n";
+
+    SemaphoreWait(exam_mutex, 1);
+    // access the critical section here.
+    std::cout <<"here\n";
+
     //Open the exam file
     char* exam_file_name = exam_list[next_exam_number];
     std::ifstream exam_file;
     exam_file.open(exam_file_name);
     std::cout<<"exam file open\n";
+    clear_exam();
 
     //Ensure that the file actually opens
     if (!exam_file.is_open()) {
@@ -60,6 +89,7 @@ void load_exam (){
     exam_file.close();   
     std::cout<<"exam file read\n";
     next_exam_number++;
+    SemaphoreSignal(exam_mutex);
 }
 
 void run_simulation() {
@@ -84,22 +114,25 @@ void run_simulation() {
             }
         }
         std::cout<<"marking exam... \n";
-        bool marked = false;
+        bool marked;
         for (int i = 0; i < rubric.size(); i++){
-            if (current_exam.questions_marked[i] == false){\
+            SemaphoreWait(question_mutex, 1);
+            if (*(current_exam.questions_marked[i]) == false){
+                if(i == rubric.size()-1) marked = true;
                 std::cout<<"marking exam question # " +std::to_string(i) +"...\n";
-                current_exam.questions_marked[i] = true;
-                marked = true;
+                *(current_exam.questions_marked[i]) = true;
+                SemaphoreSignal(question_mutex);
                 int time_period = ((rand()/ double(RAND_MAX)) + 1) * 1000;
                 sleep_for(milliseconds(time_period));
                 std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise) +"\n";
-                break;
+            } else {
+                SemaphoreSignal(question_mutex);
             }
         }
-        if(next_exam_number > exam_list.size()){
+        if(next_exam_number > exam_list.size() || current_exam.student_id == 9999){
             return;
         }
-        if (marked == false){
+        if (marked == true){
             load_exam();
         }
     }
@@ -119,18 +152,16 @@ int main (int argc, char** argv) {
     //open the rubric file
     auto rubric_file_name = argv[1];
     rubric_file = rubric_file_name;
-    std::ifstream rubric_file;
-    rubric_file.open(rubric_file_name);
+    
+    read_rubric();
 
-    //Parse the entire rubric input file and populate a vector of rubric lines.
-    //To do so, the add_rubric_line() helper function is used (see include file).
-    std::string line;
-    while (std::getline(rubric_file, line)) {
-        auto input_tokens = split_delim(line, ", ");
-        auto new_rubric_line = add_rubric_line(input_tokens);
-        rubric.push_back(new_rubric_line);
+    // Create a semaphore:
+    
+    if (( rubric_mutex = SemaphoreCreate(1)) == -1) {
+        SemaphoreRemove(rubric_mutex);
+        perror("Error in SemaphoreCreate");
+        exit(1);
     }
-    rubric_file.close();
 
     std::cout<<"rubric file read\n";
 
@@ -139,6 +170,7 @@ int main (int argc, char** argv) {
     std::ifstream ta_file;
     ta_file.open(ta_file_name);
 
+    std::string line;
     //Parse the ta input file to get # of tas
     //To do so, the add_tas() helper function is used (see include file).
     while (std::getline(ta_file, line)) {
@@ -146,6 +178,7 @@ int main (int argc, char** argv) {
         auto new_tas = add_tas(input_tokens);
         ta_num = new_tas;
     }
+    
     ta_file.close();
 
     std::cout<<"ta file read\n";
@@ -154,7 +187,21 @@ int main (int argc, char** argv) {
         exam_list.push_back(argv[i]);
     }
 
+    // Create exam semaphore:
+    if (( exam_mutex = SemaphoreCreate(1)) == -1) {
+        SemaphoreRemove(exam_mutex);
+        perror("Error in SemaphoreCreate");
+        exit(1);
+    }
+
     load_exam();
+
+    if (( question_mutex = SemaphoreCreate(1)) == -1) {
+        SemaphoreRemove(question_mutex);
+        perror("Error in SemaphoreCreate");
+        exit(1);
+    }
+
     std::cout<<"exam loaded\n";
 
     for(int i = 1; i<ta_num; i++){
@@ -168,6 +215,10 @@ int main (int argc, char** argv) {
 
     exit(c_pid);
     //write_output(exec, "execution.txt");
+
+    SemaphoreRemove(rubric_mutex);
+    SemaphoreRemove(exam_mutex);
+    SemaphoreRemove(question_mutex);
 
     return 0;
 }

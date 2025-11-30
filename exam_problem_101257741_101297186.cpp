@@ -20,15 +20,29 @@ std::tuple<std::string> run_simulation() {
     using namespace std::this_thread; // sleep_for, sleep_until
     using namespace std::chrono; // nanoseconds, system_clock, seconds
 
-    while(next_exam_number<exam_list.size()){
+    while(next_exam_number<exam_list.size() && current_exam.student_id != 9999){
         for(ta current_ta : tas){
-            for(rubric_line linez : rubric){
+            for(rubric_line linez : rubric){//reviewing and possibly correcting rubric
                 bool correct = rand() < 0.5;
-                int time_period = (rand()/2 +0.5)*1000;
+                int time_period = (rand() / 2 + 0.5) * 1000;
                 sleep_for(milliseconds(time_period));
                 if(correct){
                     correct_rubric(linez);
                 }
+            }
+            bool marked = false;
+            for(int i = 0; i < rubric.size(); i++){
+                if(current_exam.questions_marked[i] == false){
+                    current_exam.questions_marked[i] = true;
+                    marked = true;
+                    int time_period = (rand() + 1) * 1000;
+                    sleep_for(milliseconds(time_period));
+                    std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise);
+                    break;
+                }
+            }
+            if(marked == false){
+                load_exam();
             }
         }
     }
@@ -41,13 +55,14 @@ void correct_rubric(rubric_line linez){
 
     //
     if (output_file.is_open()) {
-        output_file.put();
+        for(rubric_line linez : rubric){
+            output_file << std::to_string(linez.exercise) + ", " + linez.text +"\n";
+        }
         output_file.close();  // Close the file when done
         std::cout << "File content overwritten successfully." << std::endl;
     } else {
         std::cerr << "Error opening file!" << std::endl;
     }
-    rubric_file 
 }
 
 void load_exam(){

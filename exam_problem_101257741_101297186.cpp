@@ -16,47 +16,16 @@ char* rubric_file;
 
 std::vector<ta> tas;
 
-std::tuple<std::string> run_simulation() {
-    using namespace std::this_thread; // sleep_for, sleep_until
-    using namespace std::chrono; // nanoseconds, system_clock, seconds
+void correct_rubric (int index){
+    std::cout<<"correcting rubric line...\n";
+    rubric[index].text++;
 
-    while(next_exam_number<exam_list.size() && current_exam.student_id != 9999){
-        for(ta current_ta : tas){
-            for(rubric_line linez : rubric){//reviewing and possibly correcting rubric
-                bool correct = rand() < 0.5;
-                int time_period = (rand() / 2 + 0.5) * 1000;
-                sleep_for(milliseconds(time_period));
-                if(correct){
-                    correct_rubric(linez);
-                }
-            }
-            bool marked = false;
-            for(int i = 0; i < rubric.size(); i++){
-                if(current_exam.questions_marked[i] == false){
-                    current_exam.questions_marked[i] = true;
-                    marked = true;
-                    int time_period = (rand() + 1) * 1000;
-                    sleep_for(milliseconds(time_period));
-                    std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise);
-                    break;
-                }
-            }
-            if(marked == false){
-                load_exam();
-            }
-        }
-    }
-}
+    std::ofstream output_file (rubric_file);
 
-void correct_rubric(rubric_line linez){
-    linez.text++;
-
-    std::ofstream output_file(rubric_file);
-
-    //
     if (output_file.is_open()) {
-        for(rubric_line linez : rubric){
+        for (rubric_line linez : rubric){
             output_file << std::to_string(linez.exercise) + ", " + linez.text +"\n";
+            std::cout << std::to_string(linez.exercise) + ", " + linez.text +"\n";;
         }
         output_file.close();  // Close the file when done
         std::cout << "File content overwritten successfully." << std::endl;
@@ -65,11 +34,13 @@ void correct_rubric(rubric_line linez){
     }
 }
 
-void load_exam(){
+void load_exam (){
+    std::cout<<"loading exam number " +std::to_string(next_exam_number) +"\n";
     //Open the exam file
     char* exam_file_name = exam_list[next_exam_number];
     std::ifstream exam_file;
     exam_file.open(exam_file_name);
+    std::cout<<"exam file open\n";
 
     //Ensure that the file actually opens
     if (!exam_file.is_open()) {
@@ -80,20 +51,64 @@ void load_exam(){
     //Parse the entire exam input file and populate a vector of exams.
     //To do so, the add_exam() helper function is used (see include file).
     std::string line;
-    while(std::getline(exam_file, line)) {
+    while (std::getline(exam_file, line)) {
+        std::cout<<"in while loop\n";
         auto input_tokens = split_delim(line, ", ");
-        auto new_exam = add_exam(input_tokens, rubric.size());
-        current_exam = new_exam;
+        current_exam = add_exam(input_tokens, rubric.size());
     }
     exam_file.close();   
+    std::cout<<"exam file read\n";
     next_exam_number++;
 }
 
+std::tuple<std::string> run_simulation() {
+    std::cout<<"running simulation... \n";
+    using namespace std::this_thread; // sleep_for, sleep_until
+    using namespace std::chrono; // nanoseconds, system_clock, seconds
+    srand(time(0));
+
+    while (next_exam_number<exam_list.size() && current_exam.student_id != 9999){
+        std::cout<<"grading exam number " +std::to_string(next_exam_number) +"\n";
+        for (ta current_ta : tas){
+            std::cout<<"next ta\n";
+            for (int i = 0; i < rubric.size(); i++){//reviewing and possibly correcting rubric
+                std::cout<<"checking rubric file line\n";
+                bool correct = rand()/ double(RAND_MAX) < 0.5;
+                std::cout<<"line correct: " +std::to_string(correct) +"\n";
+                int time_period = ((rand() / (double(RAND_MAX) * 2 )) + 0.5) * 1000;
+                std::cout<<"time delay: " +std::to_string(time_period) +"\n";
+                sleep_for (milliseconds(time_period));
+                if (correct){
+                    std::cout<<"correcting the rubric...\n";
+                    correct_rubric (i);
+                }
+            }
+            std::cout<<"marking exam... \n";
+            bool marked = false;
+            for (int i = 0; i < rubric.size(); i++){
+                if (current_exam.questions_marked[i] == false){\
+                    std::cout<<"marking exam question # " +std::to_string(i) +"...\n";
+                    current_exam.questions_marked[i] = true;
+                    marked = true;
+                    int time_period = ((rand()/ double(RAND_MAX)) + 1) * 1000;
+                    sleep_for(milliseconds(time_period));
+                    std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise) +"\n";
+                    break;
+                }
+            }
+            if (marked == false){
+                load_exam();
+            }
+        }
+    }
+    return "";
+}
+
 //deals with opening and reading file and writing to the execution file
-int main(int argc, char** argv) {
+int main (int argc, char** argv) {
 
     //Get the input file from the user
-    if(argc != 21) {
+    if (argc != 21) {
         std::cout << "ERROR!\nExpected 3 argument, received " << argc - 1 << std::endl;
         std::cout << "To run the program, do: ./exam_problem <your_exam_file.txt> <your_rubric_file.txt> <your_ta_file.txt>" << std::endl;
         return -1;
@@ -108,12 +123,14 @@ int main(int argc, char** argv) {
     //Parse the entire rubric input file and populate a vector of rubric lines.
     //To do so, the add_rubric_line() helper function is used (see include file).
     std::string line;
-    while(std::getline(rubric_file, line)) {
+    while (std::getline(rubric_file, line)) {
         auto input_tokens = split_delim(line, ", ");
         auto new_rubric_line = add_rubric_line(input_tokens);
         rubric.push_back(new_rubric_line);
     }
     rubric_file.close();
+
+    std::cout<<"rubric file read\n";
 
     //Open the TA file
     auto ta_file_name = argv[2];
@@ -122,19 +139,21 @@ int main(int argc, char** argv) {
 
     //Parse the ta input file to get # of tas
     //To do so, the add_tas() helper function is used (see include file).
-    while(std::getline(ta_file, line)) {
+    while (std::getline(ta_file, line)) {
         auto input_tokens = split_delim(line, ", ");
         auto new_tas = add_tas(input_tokens);
         tas = new_tas;
     }
     ta_file.close();
 
-    for(int i = 3; i<21; i++){
+    std::cout<<"ta file read\n";
+
+    for (int i = 3; i < 21; i++){
         exam_list.push_back(argv[i]);
     }
 
     load_exam();
-
+    std::cout<<"exam loaded\n";
     //With the list of processes, run the simulation
     auto [exec] = run_simulation();
 

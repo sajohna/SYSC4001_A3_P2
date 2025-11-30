@@ -28,17 +28,17 @@ enum action {
     ETC,
 };
 
-struct exam{
+struct exam {
     int                 student_id;
     std::vector<bool>   questions_marked;
 };
 
-struct rubric_line{
+struct rubric_line {
     int             exercise;
     char            text;
 };
 
-struct ta{
+struct ta {
     int             id;
     action          current_action;
     int             rubric_line;
@@ -58,26 +58,29 @@ std::vector<std::string> split_delim(std::string input, std::string delim) {
     return tokens;
 }
 
-exam add_exam(std::vector<std::string> tokens, int num_questions) {
+exam add_exam (std::vector<std::string> tokens, int num_questions) {
+    std::cout<<"in add exam\n";
     exam examz;
     examz.student_id = std::stoi(tokens[0]);
-    for(int i = 0; i<num_questions; i++){
+    examz.questions_marked.resize(num_questions);
+    for (int i = 0; i<num_questions; i++){
         examz.questions_marked[i] = false;
     }
 
     return examz;
 }
 
-rubric_line add_rubric_line(std::vector<std::string> tokens) {
+rubric_line add_rubric_line (std::vector<std::string> tokens) {
     rubric_line linez;
     linez.exercise = std::stoi(tokens[0]);
-    linez.text = std::stoi(tokens[1]);
+    linez.text = tokens[1].at(0);
+    return linez;
 }
 
-std::vector<ta> add_tas(std::vector<std::string> tokens){
+std::vector<ta> add_tas (std::vector<std::string> tokens) {
     std::vector<ta> list_tas;
     int ta_num = std::stoi(tokens[0]);
-    for(int i = 0; i < ta_num; i++){
+    for (int i = 0; i < ta_num; i++){
         ta new_ta;
         new_ta.id = i;
         new_ta.current_action = READ;
@@ -87,7 +90,7 @@ std::vector<ta> add_tas(std::vector<std::string> tokens){
     return list_tas;
 }
 
-void write_output(std::string execution, const char* filename) {
+void write_output (std::string execution, const char* filename) {
     std::ofstream output_file(filename);
 
     if (output_file.is_open()) {

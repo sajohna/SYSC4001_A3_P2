@@ -30,7 +30,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 
-std::vector<int> shm_id;
+std::vector<int> shm_id_exam;
 
 //An enumeration of actions to make assignment easier
 enum action {
@@ -116,9 +116,9 @@ std::vector<std::string> split_delim(std::string input, std::string delim) {
 }
 
 void clear_exam(){
-    if(shm_id.size() > 0){
-        for(int i = 0; i<shm_id.size(); i++){
-            if (shmctl(shm_id[i], IPC_RMID, (struct shmid_ds *) 0) < 0){
+    if(shm_id_exam.size() > 0){
+        for(int i = 0; i<shm_id_exam.size(); i++){
+            if (shmctl(shm_id_exam[i], IPC_RMID, (struct shmid_ds *) 0) < 0){
                 perror("can’t IPC_RMID shared");
                 exit(0);
             }
@@ -144,7 +144,7 @@ exam add_exam (std::vector<std::string> tokens, int num_questions) {
             perror("Error in shmat");
         }
         *(examz.questions_marked[i]) = false;
-        shm_id.push_back(shm_idz);
+        shm_id_exam.push_back(shm_idz);
     }
 
     return examz;

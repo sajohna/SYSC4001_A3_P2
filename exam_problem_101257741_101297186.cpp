@@ -13,31 +13,60 @@ int next_exam_number; //the index of the next exam file name
 int exam_mutex;
 int question_mutex;
 
-std::vector<rubric_line> rubric;
+std::vector<rubric_line*> rubric;
 char* rubric_file;
+std::vector<int> shm_id_rubric;
 int rubric_mutex;
 
 int ta_num;
 pid_t c_pid;
 
+void clear_rubric(){
+    if(shm_id_rubric.size() > 0){
+        for(int i = 0; i<shm_id_rubric.size(); i++){
+            if (shmctl(shm_id_rubric[i], IPC_RMID, (struct shmid_ds *) 0) < 0){
+                perror("can’t IPC_RMID shared");
+                exit(0);
+            }
+        }
+    }
+}
+
 void read_rubric (){
     rubric.clear();
+
     std::ifstream rubric_filez (rubric_file);
 
     //Parse the entire rubric input file and populate a vector of rubric lines.
     //To do so, the add_rubric_line() helper function is used (see include file).
     std::string line;
+    int i = 0;
     while (std::getline(rubric_filez, line)) {
         auto input_tokens = split_delim(line, ", ");
         auto new_rubric_line = add_rubric_line(input_tokens);
-        rubric.push_back(new_rubric_line);
+        auto rubric_line_pointer = &new_rubric_line;
+
+        int shm_idz;
+        int shm_size1 = sizeof(new_rubric_line);
+        if ((shm_idz = shmget(IPC_PRIVATE, shm_size1, IPC_CREAT | 0600)) <= 0) {
+            perror( "Error in shmget");
+        }
+        try{
+            rubric_line_pointer = (rubric_line * ) shmat (shm_idz, (char *)0, 0 );
+        }catch(...){
+            perror("Error in shmat");
+        }  
+
+        rubric.push_back(rubric_line_pointer);
+        i++;
     }
+    
     rubric_filez.close();
 }
 
 void correct_rubric (int index){
     std::cout<<"correcting rubric line...\n";
-    rubric[index].text++;
+    (*rubric[index]).text++;
 
     SemaphoreWait(rubric_mutex, 1);
     // access the critical section here.
@@ -45,9 +74,9 @@ void correct_rubric (int index){
     std::ofstream output_file (rubric_file);
 
     if (output_file.is_open()) {
-        for (rubric_line linez : rubric){
-            output_file << std::to_string(linez.exercise) + ", " + linez.text +"\n";
-            std::cout << std::to_string(linez.exercise) + ", " + linez.text +"\n";;
+        for (rubric_line * linez : rubric){
+            output_file << std::to_string((*linez).exercise) + ", " + (*linez).text +"\n";
+            std::cout << std::to_string((*linez).exercise) + ", " + (*linez).text +"\n";;
         }
         output_file.close();  // Close the file when done
         std::cout << "File content overwritten successfully." << std::endl;
@@ -124,7 +153,7 @@ void run_simulation() {
                 SemaphoreSignal(question_mutex);
                 int time_period = ((rand()/ double(RAND_MAX)) + 1) * 1000;
                 sleep_for(milliseconds(time_period));
-                std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string(rubric[i].exercise) +"\n";
+                std::cout << "Student Number: " +std::to_string(current_exam.student_id) +", Question Marked: " + std::to_string((*rubric[i]).exercise) +"\n";
             } else {
                 SemaphoreSignal(question_mutex);
             }
@@ -141,7 +170,6 @@ void run_simulation() {
 
 //deals with opening and reading file and writing to the execution file
 int main (int argc, char** argv) {
-
     //Get the input file from the user
     if (argc != 21) {
         std::cout << "ERROR!\nExpected 3 argument, received " << argc - 1 << std::endl;
@@ -151,17 +179,18 @@ int main (int argc, char** argv) {
 
     //open the rubric file
     auto rubric_file_name = argv[1];
-    rubric_file = rubric_file_name;
-    
-    read_rubric();
 
-    // Create a semaphore:
-    
+    rubric_file = rubric_file_name;
+
     if (( rubric_mutex = SemaphoreCreate(1)) == -1) {
         SemaphoreRemove(rubric_mutex);
         perror("Error in SemaphoreCreate");
         exit(1);
     }
+
+    read_rubric();
+
+    // Create a semaphore:
 
     std::cout<<"rubric file read\n";
 
@@ -215,7 +244,7 @@ int main (int argc, char** argv) {
 
     exit(c_pid);
     //write_output(exec, "execution.txt");
-
+    clear_rubric();
     SemaphoreRemove(rubric_mutex);
     SemaphoreRemove(exam_mutex);
     SemaphoreRemove(question_mutex);
